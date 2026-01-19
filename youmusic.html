@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Play selected YouTube links</title>
+  <title>Play Youtube list</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; padding: 16px; max-width: 900px; margin: auto; }
     .grid { display: grid; grid-template-columns: 1fr 640px; gap: 16px; align-items: start; }
@@ -15,8 +15,8 @@
   </style>
 </head>
 <body>
-  <h1>Play certain YouTube links</h1>
-  <p>Paste YouTube links (one per line) then click "Load list". Click any title to play.</p>
+  <h1>Play Youtube list</h1>
+  <p>Paste YouTube links or use pre-fill list</p>
 
   <div class="grid">
     <div>
@@ -157,10 +157,24 @@
       playIndex((currentIndex + 1) % videos.length);
     });
 
-    // Example pre-fill
+    // Pre-fill list
     linksEl.value = [
-      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      'https://youtu.be/3JZ_D3ELwOQ'
+      'https://www.youtube.com/watch?v=NRvTj2zM5Uw&list=RDNRvTj2zM5Uw&start_radio=1',
+      'https://www.youtube.com/watch?v=WCgPzs2APw8&list=RDWCgPzs2APw8&start_radio=1',
+      'https://www.youtube.com/watch?v=fcuWKpyUGHo&list=RDWCgPzs2APw8&index=5',
+      'https://www.youtube.com/watch?v=D67jM8nO7Ag&list=RDWCgPzs2APw8&index=9',
+      'https://www.youtube.com/watch?v=KJezMI2ibH0&list=RDWCgPzs2APw8&index=10',
+      'https://www.youtube.com/watch?v=qOVLUiha1B8&list=RDWCgPzs2APw8&index=19',
+      'https://www.youtube.com/watch?v=lS-BfZfBbvU&list=RDlS-BfZfBbvU&start_radio=1',
+      'https://www.youtube.com/watch?v=gqELqRCnW6g&list=RDgqELqRCnW6g&start_radio=1',
+      'https://www.youtube.com/watch?v=PWZylTw6RGY&list=RDPWZylTw6RGY&start_radio=1',
+      'https://www.youtube.com/watch?v=OMv_EPMED8Y&list=RDOMv_EPMED8Y&start_radio=1',
+      'https://www.youtube.com/watch?v=p9ZSZFwVqqc&list=RDp9ZSZFwVqqc&start_radio=1',
+      'https://www.youtube.com/watch?v=rbBl5Jqs7ls&list=RDrbBl5Jqs7ls&start_radio=1',
+      'https://www.youtube.com/watch?v=geCGtv-gQOc&list=RDgeCGtv-gQOc&start_radio=1',
+      'https://www.youtube.com/watch?v=woLkMny_xDI&list=RDwoLkMny_xDI&start_radio=1',
+      'https://www.youtube.com/watch?v=DP2vmsftZHY&list=RDDP2vmsftZHY&start_radio=1'
+      
     ].join('\n');
   </script>
 </body>
