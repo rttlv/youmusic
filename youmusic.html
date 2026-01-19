@@ -24,7 +24,7 @@
       <textarea id="links" placeholder="youtube link"></textarea>
       <div style="margin-top:8px;">
         <button id="load">Load list</button>
-        <label style="margin-left:12px;"><input type="checkbox" id="autoplay" checked> Autoplay on select</label>
+        <label style="margin-left:12px;"><input type="checkbox" id="autoplay" checked> Autoplay on select / advance</label>
       </div>
 
       <h3>Videos</h3>
@@ -33,7 +33,7 @@
 
     <div>
       <h3>Player</h3>
-      <!-- privacy-enhanced domain; show related=0 to reduce related videos -->
+      <!-- The iframe will be controlled by the YouTube IFrame API -->
       <iframe id="player" src="about:blank" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
       <div style="margin-top:8px;">
         <button id="prev">Prev</button>
@@ -42,6 +42,9 @@
       </div>
     </div>
   </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
 
   <script>
     // Parse YouTube video ID from multiple URL formats
@@ -73,7 +76,7 @@
 
     const linksEl = document.getElementById('links');
     const listEl = document.getElementById('list');
-    const player = document.getElementById('player');
+    const playerEl = document.getElementById('player');
     const loadBtn = document.getElementById('load');
     const autoplayChk = document.getElementById('autoplay');
     const prevBtn = document.getElementById('prev');
@@ -83,13 +86,15 @@
     let videos = []; // {id, title (url), raw}
     let currentIndex = -1;
 
+    // YT API player instance (when available)
+    let ytPlayer = null;
+    let apiReady = false;
+
+    // build fallback embed url (used if API not ready)
     function buildEmbedUrl(id, opts = {}) {
-      // Using privacy-enhanced domain: youtube-nocookie.com
-      // opts: autoplay (0/1), start (seconds)
       const autoplay = opts.autoplay ? 1 : 0;
       const start = opts.start ? `&start=${opts.start}` : '';
-      // rel=0 reduces showing unrelated videos after end (subject to YouTube rules)
-      return `https://www.youtube-nocookie.com/embed/${id}?rel=0&autoplay=${autoplay}${start}`;
+      return `https://www.youtube-nocookie.com/embed/${id}?rel=0&autoplay=${autoplay}${start}&enablejsapi=1`;
     }
 
     function renderList() {
@@ -112,7 +117,11 @@
           videos.splice(idx, 1);
           if (idx === currentIndex) {
             currentIndex = -1;
-            player.src = 'about:blank';
+            if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+              ytPlayer.stopVideo();
+            } else {
+              playerEl.src = 'about:blank';
+            }
             currentLabel.textContent = '';
           } else if (idx < currentIndex) {
             currentIndex--; // shift index
@@ -129,8 +138,70 @@
       currentIndex = idx;
       const v = videos[idx];
       const autoplay = autoplayChk.checked;
-      player.src = buildEmbedUrl(v.id, { autoplay: autoplay ? 1 : 0 });
+
+      // If YT API ready, use it to load video (gives us events)
+      if (apiReady && ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+        try {
+          // load the video by id
+          ytPlayer.loadVideoById({ videoId: v.id, startSeconds: 0 });
+          if (autoplay) {
+            ytPlayer.playVideo();
+          } else {
+            ytPlayer.pauseVideo();
+          }
+        } catch (e) {
+          // fallback to changing iframe src
+          playerEl.src = buildEmbedUrl(v.id, { autoplay: autoplay ? 1 : 0 });
+        }
+      } else {
+        // fallback: set iframe src directly (enablejsapi=1 added in URL)
+        playerEl.src = buildEmbedUrl(v.id, { autoplay: autoplay ? 1 : 0 });
+      }
+
       currentLabel.textContent = `${idx + 1} / ${videos.length}: ${v.title || v.raw}`;
+      renderList();
+    }
+
+    // When YT API is ready it will call this global function
+    function onYouTubeIframeAPIReady() {
+      apiReady = true;
+      ytPlayer = new YT.Player('player', {
+        height: '360',
+        width: '100%',
+        videoId: '',
+        playerVars: {
+          rel: 0,
+          autoplay: 0
+        },
+        events: {
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
+        }
+      });
+    }
+    // expose globally (some bundlers/minifiers require explicit global)
+    window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+    function onPlayerError(e) {
+      console.warn('YouTube player error', e);
+    }
+
+    function onPlayerStateChange(event) {
+      // YT.PlayerState.ENDED === 0
+      if (event.data === YT.PlayerState.ENDED) {
+        // only advance automatically if the autoplay checkbox is checked
+        if (autoplayChk.checked && videos.length > 0) {
+          // advance to next (wrap-around)
+          playIndex((currentIndex + 1) % videos.length);
+        }
+      } else if (event.data === YT.PlayerState.PLAYING) {
+        // update label when the API reports playing (ensures correct title shown if changed)
+        if (currentIndex >= 0 && currentIndex < videos.length) {
+          const v = videos[currentIndex];
+          currentLabel.textContent = `${currentIndex + 1} / ${videos.length}: ${v.title || v.raw}`;
+          renderList();
+        }
+      }
     }
 
     loadBtn.addEventListener('click', () => {
@@ -174,7 +245,6 @@
       'https://www.youtube.com/watch?v=geCGtv-gQOc&list=RDgeCGtv-gQOc&start_radio=1',
       'https://www.youtube.com/watch?v=woLkMny_xDI&list=RDwoLkMny_xDI&start_radio=1',
       'https://www.youtube.com/watch?v=DP2vmsftZHY&list=RDDP2vmsftZHY&start_radio=1'
-      
     ].join('\n');
   </script>
 </body>
