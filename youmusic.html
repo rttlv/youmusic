@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Play selected YouTube links</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; padding: 16px; max-width: 900px; margin: auto; }
+    .grid { display: grid; grid-template-columns: 1fr 640px; gap: 16px; align-items: start; }
+    textarea { width: 100%; height: 120px; }
+    iframe { width: 100%; height: 360px; border: 0; background: #000; }
+    ul { padding-left: 16px; }
+    li { margin: 6px 0; }
+    button { margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Play certain YouTube links</h1>
+  <p>Paste YouTube links (one per line) then click "Load list". Click any title to play.</p>
+
+  <div class="grid">
+    <div>
+      <label for="links">YouTube links (one per line):</label>
+      <textarea id="links" placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"></textarea>
+      <div style="margin-top:8px;">
+        <button id="load">Load list</button>
+        <label style="margin-left:12px;"><input type="checkbox" id="autoplay" checked> Autoplay on select</label>
+      </div>
+
+      <h3>Videos</h3>
+      <ul id="list"></ul>
+    </div>
+
+    <div>
+      <h3>Player</h3>
+      <!-- privacy-enhanced domain; show related=0 to reduce related videos -->
+      <iframe id="player" src="about:blank" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <div style="margin-top:8px;">
+        <button id="prev">Prev</button>
+        <button id="next">Next</button>
+        <span id="currentLabel" style="margin-left:8px"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Parse YouTube video ID from multiple URL formats
+    function extractVideoId(url) {
+      if (!url) return null;
+      // remove leading/trailing whitespace
+      url = url.trim();
+      // If user gives just an id
+      if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+      try {
+        const u = new URL(url);
+        // youtube watch?v=ID
+        if (u.hostname.includes('youtube.com')) {
+          if (u.searchParams.has('v')) return u.searchParams.get('v');
+          // /embed/ID or /v/ID
+          const pathParts = u.pathname.split('/');
+          return pathParts[pathParts.length - 1] || null;
+        }
+        // youtu.be/ID
+        if (u.hostname === 'youtu.be') {
+          return u.pathname.replace('/', '');
+        }
+      } catch (e) {
+        // not a URL, maybe raw id
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+      }
+      return null;
+    }
+
+    const linksEl = document.getElementById('links');
+    const listEl = document.getElementById('list');
+    const player = document.getElementById('player');
+    const loadBtn = document.getElementById('load');
+    const autoplayChk = document.getElementById('autoplay');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const currentLabel = document.getElementById('currentLabel');
+
+    let videos = []; // {id, title (url), raw}
+    let currentIndex = -1;
+
+    function buildEmbedUrl(id, opts = {}) {
+      // Using privacy-enhanced domain: youtube-nocookie.com
+      // opts: autoplay (0/1), start (seconds)
+      const autoplay = opts.autoplay ? 1 : 0;
+      const start = opts.start ? `&start=${opts.start}` : '';
+      // rel=0 reduces showing unrelated videos after end (subject to YouTube rules)
+      return `https://www.youtube-nocookie.com/embed/${id}?rel=0&autoplay=${autoplay}${start}`;
+    }
+
+    function renderList() {
+      listEl.innerHTML = '';
+      videos.forEach((v, idx) => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = v.title || v.raw;
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          playIndex(idx);
+        });
+        li.appendChild(a);
+        // small remove button
+        const rm = document.createElement('button');
+        rm.textContent = 'Remove';
+        rm.addEventListener('click', (e) => {
+          e.preventDefault();
+          videos.splice(idx, 1);
+          if (idx === currentIndex) {
+            currentIndex = -1;
+            player.src = 'about:blank';
+            currentLabel.textContent = '';
+          } else if (idx < currentIndex) {
+            currentIndex--; // shift index
+          }
+          renderList();
+        });
+        li.appendChild(rm);
+        listEl.appendChild(li);
+      });
+    }
+
+    function playIndex(idx) {
+      if (idx < 0 || idx >= videos.length) return;
+      currentIndex = idx;
+      const v = videos[idx];
+      const autoplay = autoplayChk.checked;
+      player.src = buildEmbedUrl(v.id, { autoplay: autoplay ? 1 : 0 });
+      currentLabel.textContent = `${idx + 1} / ${videos.length}: ${v.title || v.raw}`;
+    }
+
+    loadBtn.addEventListener('click', () => {
+      const lines = linksEl.value.split('\n').map(l => l.trim()).filter(Boolean);
+      videos = lines.map(l => {
+        const id = extractVideoId(l);
+        return { id: id, raw: l, title: id ? (`https://youtu.be/${id}`) : l };
+      }).filter(v => v.id); // discard invalid
+      if (videos.length === 0) {
+        alert('No valid YouTube links / IDs found.');
+        return;
+      }
+      renderList();
+      // auto-play first if checkbox set
+      playIndex(0);
+    });
+
+    prevBtn.addEventListener('click', () => {
+      if (videos.length === 0) return;
+      playIndex((currentIndex - 1 + videos.length) % videos.length);
+    });
+    nextBtn.addEventListener('click', () => {
+      if (videos.length === 0) return;
+      playIndex((currentIndex + 1) % videos.length);
+    });
+
+    // Example pre-fill
+    linksEl.value = [
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://youtu.be/3JZ_D3ELwOQ'
+    ].join('\n');
+  </script>
+</body>
+</html>
